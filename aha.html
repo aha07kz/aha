@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0f172a">
+<title>APEX Global Exchange</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="min-h-screen">
+
+<!-- ШАПКА -->
+<header class="hdr border-b border-slate-700">
+  <div class="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center font-extrabold text-slate-900">A</div>
+      <div><div class="font-extrabold text-lg leading-none">APEX Global Exchange</div>
+      <div class="text-xs text-slate-400 mt-1 flex items-center gap-2"><span class="live"></span><span>Рынок открыт • NYSE / NASDAQ</span><span class="num" id="clock"></span></div></div>
+    </div>
+    <nav class="grid grid-cols-3 gap-2 order-last w-full md:order-none md:w-auto md:flex">
+      <button data-v="terminal" class="tab on">Торговый терминал</button>
+      <button data-v="catalog" class="tab">Каталог</button>
+      <button data-v="account" class="tab">Личный кабинет</button>
+    </nav>
+    <div class="flex items-center gap-4">
+      <div class="hidden sm:block text-sm text-slate-400">Капитализация рынка <span id="mcap" class="num text-slate-100 font-semibold ml-1"></span></div>
+    </div>
+  </div>
+  <div class="overflow-hidden border-t border-slate-800 py-2 text-sm"><div id="indices" class="marquee"></div></div>
+</header>
+
+<main id="v-terminal" class="view p-4 grid gap-4 lg:grid-cols-12">
+
+  <!-- ВОТЧЛИСТ -->
+  <section class="lg:col-span-3 flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-1" id="watch"></section>
+
+  <!-- ГРАФИК, СТАКАН, ЛЕНТА -->
+  <section class="lg:col-span-6 space-y-4">
+    <div class="card p-4">
+      <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
+        <div><div class="text-xl font-bold" id="selName"></div><div class="text-xs text-slate-400" id="selTicker"></div></div>
+        <div class="text-right"><div class="text-3xl font-extrabold num" id="selPrice"></div><div class="num text-sm" id="selChg"></div></div>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3 text-sm"><div><div class="text-xs text-slate-400">Капитализация</div><div id="sCap" class="num font-semibold"></div></div><div><div class="text-xs text-slate-400">Объём 24ч</div><div id="sVol" class="num font-semibold"></div></div><div><div class="text-xs text-slate-400">Макс. дня</div><div id="sHi" class="num font-semibold"></div></div><div><div class="text-xs text-slate-400">Мин. дня</div><div id="sLo" class="num font-semibold"></div></div></div>
+      <div class="h-64"><canvas id="chart"></canvas></div>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card p-4">
+        <div class="font-semibold mb-2">Стакан ордеров</div>
+        <div class="flex justify-between text-xs text-slate-400 mb-1"><span>Цена</span><span>Объём</span></div>
+        <div id="asks" class="text-sm num"></div>
+        <div id="spread" class="my-1 py-1 text-center text-xs text-slate-400 border-y border-slate-700"></div>
+        <div id="bids" class="text-sm num"></div>
+      </div>
+      <div class="card p-4">
+        <div class="font-semibold mb-2">Лента сделок</div>
+        <div class="flex justify-between text-xs text-slate-400 mb-1"><span>Время</span><span>Цена</span><span>Объём</span></div>
+        <div id="tape" class="text-sm num h-[19rem] overflow-hidden"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ТОРГОВЫЙ ТЕРМИНАЛ -->
+  <section class="lg:col-span-3 space-y-4">
+    <div class="card p-4">
+      <div class="text-xs text-slate-400">Свободные средства</div>
+      <div class="text-2xl font-extrabold num" id="cash"></div>
+      <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+        <div><div class="text-xs text-slate-400">Стоимость портфеля</div><div class="num font-semibold" id="pv"></div></div>
+        <div><div class="text-xs text-slate-400">Прибыль / убыток</div><div class="num font-semibold" id="pl"></div></div>
+      </div>
+    </div>
+    <div class="card p-4 space-y-3">
+      <div class="grid grid-cols-2 gap-1 bg-slate-900 rounded-lg p-1 text-sm font-semibold">
+        <button id="bBuy" class="py-2 rounded-md">Купить</button><button id="bSell" class="py-2 rounded-md">Продать</button>
+      </div>
+      <div class="grid grid-cols-2 gap-1 text-sm">
+        <button id="tMkt" class="py-1.5 rounded-md border border-slate-600">Рыночный</button><button id="tLim" class="py-1.5 rounded-md border border-slate-600">Лимитный</button>
+      </div>
+      <label class="block text-xs text-slate-400">Количество
+        <div class="flex gap-2 mt-1"><input id="qty" type="number" min="1" step="1" value="1"><button id="maxBtn" class="px-3 text-xs rounded-lg bg-slate-700 hover:bg-slate-600">Макс</button></div></label>
+      <label id="limWrap" class="block text-xs text-slate-400 hidden">Лимитная цена<input id="lim" type="number" step="0.01" class="mt-1"></label>
+      <div class="space-y-1 text-sm border-t border-slate-700 pt-3">
+        <div class="flex justify-between"><span class="text-slate-400">Сумма сделки</span><span id="sub" class="num"></span></div>
+        <div class="flex justify-between"><span class="text-slate-400">Комиссия 0,1%</span><span id="fee" class="num"></span></div>
+        <div class="flex justify-between font-bold"><span id="totLbl"></span><span id="total" class="num"></span></div>
+      </div>
+      <button id="submit" class="w-full py-3 rounded-lg font-bold text-slate-900 transition active:scale-95"></button>
+    </div>
+    <div class="card p-4">
+      <div class="font-semibold mb-2">Отложенные ордера</div>
+      <div id="pending" class="text-sm space-y-1"></div>
+    </div>
+  </section>
+
+  <section class="lg:col-span-12 card p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><div class="font-semibold">Рыночные новости</div><div class="text-xs text-slate-400">Reuters · Bloomberg · CNBC · Financial Times</div></div>
+    <div id="news" class="max-h-80 overflow-auto"></div>
+  </section>
+</main>
+
+<main id="v-catalog" class="view hidden p-4 space-y-4">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap gap-2">
+      <button data-f="all" class="chip on">Все</button><button data-f="stock" class="chip">Акции</button><button data-f="bond" class="chip">Облигации</button><button data-f="etf" class="chip">ETF (Фонды)</button><button data-f="fx" class="chip">Валюта</button>
+    </div>
+    <div class="w-full sm:w-72"><input id="cSearch" placeholder="Поиск по тикеру или названию" autocomplete="off"></div>
+  </div>
+  <div id="cGrid" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
+</main>
+
+<main id="v-account" class="view hidden p-4 grid gap-4 lg:grid-cols-12">
+  <section class="lg:col-span-12 grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="card p-4"><div class="text-xs text-slate-400">Общая стоимость</div><div id="kEq" class="text-2xl font-extrabold num "></div></div><div class="card p-4"><div class="text-xs text-slate-400">Свободные средства</div><div id="kCash" class="text-2xl font-extrabold num "></div></div><div class="card p-4"><div class="text-xs text-slate-400">Стоимость позиций</div><div id="kPV" class="text-2xl font-extrabold num "></div></div><div class="card p-4"><div class="text-xs text-slate-400">Прибыль / убыток</div><div id="kPL" class="text-2xl font-extrabold num "></div></div>
+  </section>
+  <section class="lg:col-span-4 card p-4">
+    <div class="font-semibold mb-2">Распределение активов</div>
+    <div class="h-52"><canvas id="pie"></canvas></div>
+    <div id="alloc" class="text-sm space-y-1 mt-3"></div>
+  </section>
+  <section class="lg:col-span-8 card p-4 overflow-x-auto">
+    <div class="font-semibold mb-2">Портфель</div>
+    <table class="w-full text-sm num">
+      <thead class="text-xs text-slate-400 text-right"><tr><th class="text-left py-1">Тикер</th><th>Кол-во</th><th>Ср. цена</th><th>Стоимость</th><th>P/L $</th><th>P/L %</th><th></th></tr></thead>
+      <tbody id="port" class="text-right"></tbody>
+    </table>
+  </section>
+  <section class="lg:col-span-12 card p-4 overflow-x-auto">
+    <div class="font-semibold mb-2">История операций</div>
+    <table class="w-full text-sm num">
+      <thead class="text-xs text-slate-400 text-right"><tr><th class="text-left py-1">Время</th><th class="text-left py-1">Операция</th><th class="text-left py-1">Тикер</th><th class="py-1">Кол-во</th><th class="py-1">Цена исполнения</th><th class="py-1">Комиссия</th><th class="py-1">Сумма</th></tr></thead>
+      <tbody id="hist" class="text-right"></tbody>
+    </table>
+  </section>
+</main>
+
+<div id="modal" class="hidden fixed inset-0 z-40 bg-black/60 flex items-center justify-center p-4"><div id="mBody" class="card p-5 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-auto"></div></div>
+
+<div id="toasts" class="fixed top-4 right-4 left-4 sm:left-auto sm:w-96 space-y-2 z-50"></div>
+
+<script>
+/* ---------- Состояние ---------- */
+const $ = id => document.getElementById(id);
+const fmt = (n, d = 2) => n.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+const usd = n => '$' + fmt(n);
+const cf = new Intl.NumberFormat('en-US', {notation:'compact', maximumFractionDigits:2});
+const FEE = 0.001; // комиссия брокера 0,1%
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+// Каталог активов: цена, волатильность, количество акций (для капитализации, млрд)
+const stocks = [
+  {t:'AAPL', n:'Apple Inc.',            p:228.5, v:.0016, sh:15.2},
+  {t:'TSLA', n:'Tesla, Inc.',           p:342.1, v:.0035, sh:3.2},
+  {t:'MSFT', n:'Microsoft Corp.',       p:421.7, v:.0014, sh:7.4},
+  {t:'NVDA', n:'NVIDIA Corp.',          p:139.8, v:.0030, sh:24.5},
+  {t:'KO',   n:'The Coca-Cola Co.',     p:62.4,  v:.0009, sh:4.3},
+  {t:'CAT',  n:'Caterpillar Inc.',      p:389.2, v:.0013, sh:.48},
+  {t:'AMZN', n:'Amazon.com, Inc.',      p:201.3, v:.0018, sh:10.6},
+  {t:'JPM',  n:'JPMorgan Chase & Co.',  p:241.9, v:.0012, sh:2.8},
+];
+stocks.push(
+  {t:'UST10Y', n:'US Treasury 10Y', p:96.4, v:.0004, cap:28e12},
+  {t:'OFZ', n:'ОФЗ 26243', p:91.8, v:.0006, cap:1.2e12},
+  {t:'SPY', n:'SPDR S&P 500 ETF', p:601.3, v:.0007, cap:600e9},
+  {t:'QQQ', n:'Invesco QQQ Trust', p:518.2, v:.0009, cap:320e9},
+  {t:'GLD', n:'SPDR Gold Shares', p:243.6, v:.0008, cap:75e9},
+  {t:'EURUSD', n:'EUR/USD (лот 1 000 €)', p:1085.4, v:.0005},
+  {t:'KZT', n:'USD/KZT (лот 100 000 ₸)', p:192.2, v:.0004});
+const META = {
+  AAPL:{type:'stock', div:.45, pe:36.2, desc:'Разрабатывает iPhone, Mac и сервисы App Store, iCloud, Apple Music. Основная выручка — продажи устройств и подписки.'},
+  TSLA:{type:'stock', div:0, pe:112, desc:'Электромобили, накопители энергии и солнечные панели; развивает автономное вождение и робототехнику.'},
+  MSFT:{type:'stock', div:.72, pe:35.8, desc:'Программное обеспечение и облако: Windows, Office, Azure, LinkedIn; крупный инвестор в ИИ.'},
+  NVDA:{type:'stock', div:.03, pe:54.1, desc:'Графические процессоры и ускорители для центров обработки данных и ИИ.'},
+  KO:{type:'stock', div:3, pe:25.4, desc:'Крупнейший производитель безалкогольных напитков: Coca-Cola, Sprite, Fanta, Costa.'},
+  CAT:{type:'stock', div:1.5, pe:17.9, desc:'Строительная и горнодобывающая техника, двигатели и турбины.'},
+  AMZN:{type:'stock', div:0, pe:41.7, desc:'Электронная коммерция, облако AWS, реклама и подписка Prime.'},
+  JPM:{type:'stock', div:2, pe:13.2, desc:'Крупнейший банк США: розничный и инвестиционный банкинг, управление активами.'},
+  UST10Y:{type:'bond', div:4.4, desc:'Десятилетние казначейские облигации США — ориентир безрисковой ставки. Цена указана за 100 $ номинала, показатель — доходность к погашению.'},
+  OFZ:{type:'bond', div:15.2, desc:'Облигации федерального займа РФ с фиксированным купоном. Цена — в долларовом эквиваленте за 100 номинала.'},
+  SPY:{type:'etf', div:1.2, pe:25.1, desc:'Фонд, повторяющий индекс S&P 500: 500 крупнейших компаний США.'},
+  QQQ:{type:'etf', div:.6, pe:31.4, desc:'Фонд на индекс Nasdaq-100 с упором на технологический сектор.'},
+  GLD:{type:'etf', div:0, desc:'Фонд, обеспеченный физическим золотом; следует за ценой металла.'},
+  EURUSD:{type:'fx', desc:'Курс евро к доллару. Один лот — 1 000 евро, цена лота указана в долларах.'},
+  KZT:{type:'fx', desc:'Курс доллара к казахстанскому тенге (около 520 ₸ за $). Один лот — 100 000 ₸, цена лота указана в долларах.'},
+};
+stocks.forEach(s => Object.assign(s, META[s.t]));
+const TYPES = {stock:'Акции', bond:'Облигации', etf:'ETF', fx:'Валюта'};
+const EX = {stock:'NASDAQ', bond:'OTC', etf:'NYSE Arca', fx:'FX'};
+const capStr = s => { const c = s.sh ? s.p * s.sh * 1e9 : s.cap; return c ? '$' + cf.format(c) : '—'; };
+const VOL = {AAPL:48, TSLA:92, MSFT:21, NVDA:210, KO:14, CAT:3, AMZN:38, JPM:9}; // средний дневной объём, млн акций
+const SHORT = {AAPL:'Apple', TSLA:'Tesla', MSFT:'Microsoft', NVDA:'NVIDIA', KO:'Coca-Cola', CAT:'Caterpillar', AMZN:'Amazon', JPM:'JPMorgan'};
+stocks.forEach(s => {
+  s.hist = Array.from({length:60}, () => s.p *= 1 + rnd(-s.v, s.v));
+  s.p = s.last = s.hist[59]; s.open = s.hist[0];
+  s.hi = Math.max(...s.hist); s.lo = Math.min(...s.hist);
+  s.vol = (VOL[s.t] || 5) * 1e6 * rnd(.8, 1.1); s.imp = null;
+});
+
+const indices = [
+  {n:'S&P 500', p:5987.4, v:.0006}, {n:'NASDAQ', p:19120.8, v:.0009},
+  {n:'FTSE 100', p:8210.3, v:.0005}, {n:'Nikkei 225', p:38650.2, v:.0008},
+  {n:'DAX', p:19430.6, v:.0007}, {n:'Dow Jones', p:43870.1, v:.0005},
+].map(i => ({...i, open:i.p, last:i.p}));
+
+const S = {cash:10000, pos:{}, hist:[], pending:[], sel:'AAPL', side:'buy', type:'market', tape:[]};
+const cur = () => stocks.find(s => s.t === S.sel);
+
+/* ---------- Тосты ---------- */
+function toast(msg, ok = true) {
+  const d = document.createElement('div');
+  d.className = 'toast card px-4 py-3 text-sm shadow-xl border-l-4 ' + (ok ? 'border-l-emerald-500' : 'border-l-red-500');
+  d.textContent = msg; $('toasts').appendChild(d);
+  setTimeout(() => { d.style.transition = 'opacity .4s'; d.style.opacity = 0; setTimeout(() => d.remove(), 400); }, 3200);
+}
+
+/* ---------- График (Chart.js) ---------- */
+const chart = new Chart($('chart'), {
+  type:'line',
+  data:{labels:Array(60).fill(''), datasets:[{data:[], borderColor:'#10b981', borderWidth:2, pointRadius:0, tension:.3, fill:true, backgroundColor:'rgba(16,185,129,.12)'}]},
+  options:{responsive:true, maintainAspectRatio:false, animation:{duration:500}, plugins:{legend:{display:false}, tooltip:{intersect:false, mode:'index'}},
+    scales:{x:{display:false}, y:{position:'right', grid:{color:'#334155'}, ticks:{color:'#94a3b8'}}}}
+});
+
+/* ---------- Исполнение ордеров ---------- */
+function execute(side, s, qty, price) {
+  const cost = qty * price, fee = cost * FEE;
+  if (side === 'buy') {
+    if (cost + fee > S.cash + 1e-9) return toast('Недостаточно средств: нужно ' + usd(cost + fee) + ' с учётом комиссии', false), false;
+    const p = S.pos[s.t] || {qty:0, avg:0};
+    p.avg = (p.avg * p.qty + cost) / (p.qty + qty); p.qty += qty; S.pos[s.t] = p; S.cash -= cost + fee;
+  } else {
+    const p = S.pos[s.t];
+    if (!p || p.qty < qty) return toast('Недостаточно акций ' + s.t + ' для продажи', false), false;
+    p.qty -= qty; S.cash += cost - fee; if (!p.qty) delete S.pos[s.t];
+  }
+  S.hist.unshift({time:new Date().toLocaleTimeString('ru-RU'), side, t:s.t, qty, price, fee});
+  toast((side === 'buy' ? 'Куплено ' : 'Продано ') + qty + ' × ' + s.t + ' по ' + usd(price) + ' · комиссия ' + usd(fee));
+  return true;
+}
+
+function submitOrder() {
+  const s = cur(), qty = parseInt($('qty').value);
+  if (!qty || qty < 1) return toast('Введите количество — целое число от 1', false);
+  if (S.type === 'market') execute(S.side, s, qty, s.p);
+  else {
+    const lp = parseFloat($('lim').value);
+    if (!lp || lp <= 0) return toast('Введите лимитную цену', false);
+    if (S.side === 'buy' && qty * lp * (1 + FEE) > S.cash) return toast('Недостаточно средств для лимитного ордера', false);
+    if (S.side === 'sell' && (S.pos[s.t]?.qty || 0) < qty) return toast('Недостаточно акций ' + s.t, false);
+    S.pending.push({id:Date.now(), side:S.side, t:s.t, qty, price:lp});
+    toast('Лимитный ордер размещён: ' + (S.side === 'buy' ? 'покупка ' : 'продажа ') + qty + ' × ' + s.t + ' @ ' + usd(lp));
+  }
+  renderAll();
+}
+
+function checkPending() {
+  S.pending = S.pending.filter(o => {
+    const s = stocks.find(x => x.t === o.t);
+    const hit = o.side === 'buy' ? s.p <= o.price : s.p >= o.price;
+    return hit ? !execute(o.side, s, o.qty, s.p) && false : true;
+  });
+}
+
+/* ---------- Рендер ---------- */
+function spark(h, up) {
+  const mn = Math.min(...h), mx = Math.max(...h), r = mx - mn || 1;
+  const pts = h.map((v, i) => (i / (h.length - 1) * 100).toFixed(1) + ',' + (24 - (v - mn) / r * 22).toFixed(1)).join(' ');
+  return `<svg viewBox="0 0 100 26" class="w-full h-7" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? '#10b981' : '#ef4444'}" stroke-width="1.5"/></svg>`;
+}
+
+function renderWatch() {
+  $('watch').innerHTML = stocks.filter(s => S.watch.has(s.t)).map(s => {
+    const ch = (s.p / s.open - 1) * 100, up = ch >= 0, fl = s.p > s.last ? 'fu' : s.p < s.last ? 'fd' : '';
+    return `<div data-t="${s.t}" class="card row cursor-pointer p-3 shrink-0 w-44 lg:w-auto ${s.t === S.sel ? 'ring-1 ring-emerald-500' : ''}">
+      <div class="flex justify-between items-center"><div><div class="font-bold">${s.t}</div><div class="text-xs text-slate-400">${s.n}</div></div>
+      <div class="text-right num rounded px-1 ${fl}"><div class="font-semibold">${usd(s.p)}</div><div class="text-xs ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${fmt(Math.abs(ch))}%</div></div></div>
+      ${spark(s.hist, up)}</div>`;
+  }).join('');
+  document.querySelectorAll('#watch [data-t]').forEach(e => e.onclick = () => { S.sel = e.dataset.t; $('lim').value = cur().p.toFixed(2); renderAll(); updateChart(); });
+}
+
+function updateChart() {
+  const s = cur(), up = s.p >= s.open, c = up ? '#10b981' : '#ef4444';
+  const ds = chart.data.datasets[0];
+  ds.data = [...s.hist]; ds.borderColor = c; ds.backgroundColor = up ? 'rgba(16,185,129,.12)' : 'rgba(239,68,68,.12)';
+  chart.update();
+}
+
+function renderSel() {
+  const s = cur(), d = s.p - s.open, up = d >= 0;
+  $('selName').textContent = s.n; $('selTicker').textContent = EX[s.type] + ' · ' + s.t;
+  $('selPrice').textContent = usd(s.p);
+  $('sCap').textContent = capStr(s); $('sVol').textContent = cf.format(s.vol);
+  $('sHi').textContent = usd(s.hi); $('sLo').textContent = usd(s.lo);
+  $('selChg').className = 'num text-sm ' + (up ? 'up' : 'down');
+  $('selChg').textContent = (up ? '+' : '') + fmt(d) + ' (' + (up ? '+' : '') + fmt(d / s.open * 100) + '%)';
+}
+
+function renderBook() {
+  const s = cur(), sp = s.p * 0.0004, fl = s.p > s.last ? 'fu' : s.p < s.last ? 'fd' : '';
+  const row = (px, cls) => `<div class="flex justify-between px-1 row"><span class="${cls}">${fmt(px)}</span><span>${Math.floor(rnd(20, 900))}</span></div>`;
+  $('asks').innerHTML = Array.from({length:7}, (_, i) => row(s.p + sp * (7 - i), 'down')).join('');
+  $('bids').innerHTML = Array.from({length:7}, (_, i) => row(s.p - sp * (i + 1), 'up')).join('');
+  $('spread').innerHTML = `<span class="px-2 rounded ${fl}">${usd(s.p)}</span> · спред ${fmt(sp * 2)}`;
+}
+
+function pushTape() {
+  const s = cur(), buy = Math.random() > .5;
+  S.tape.unshift({time:new Date().toLocaleTimeString('ru-RU'), p:s.p + rnd(-1, 1) * s.p * .0003, q:Math.floor(rnd(1, 250)), buy});
+  S.tape = S.tape.slice(0, 14);
+  $('tape').innerHTML = S.tape.map(x => `<div class="flex justify-between row px-1"><span class="text-slate-400">${x.time}</span><span class="${x.buy ? 'up' : 'down'}">${fmt(x.p)}</span><span>${x.q}</span></div>`).join('');
+}
+
+function renderPortfolio() {
+  let pv = 0, cost = 0;
+  const rows = Object.entries(S.pos).map(([t, p]) => {
+    const s = stocks.find(x => x.t === t), val = p.qty * s.p, pl = val - p.qty * p.avg, pc = pl / (p.qty * p.avg) * 100;
+    pv += val; cost += p.qty * p.avg; const c = pl >= 0 ? 'up' : 'down';
+    return `<tr class="border-t border-slate-700 row"><td class="text-left py-2 font-bold">${t}</td><td>${p.qty}</td><td>${usd(p.avg)}</td><td>${usd(val)}</td>
+      <td class="${c}">${pl >= 0 ? '+' : ''}${fmt(pl)}</td><td class="${c}">${pl >= 0 ? '+' : ''}${fmt(pc)}%</td>
+      <td><button data-sell="${t}" class="px-3 py-1 text-xs rounded-md bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/30">${pl >= 0 ? 'Зафиксировать прибыль' : 'Закрыть позицию'}</button></td></tr>`;
+  });
+  $('port').innerHTML = rows.join('') || '<tr><td colspan="7" class="py-6 text-center text-slate-400">Портфель пуст. Выберите акцию и разместите первый ордер.</td></tr>';
+  document.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => { const t = b.dataset.sell; execute('sell', stocks.find(x => x.t === t), S.pos[t].qty, stocks.find(x => x.t === t).p); renderAll(); });
+  const pl = pv - cost; renderAccount(pv, pl);
+  $('cash').textContent = usd(S.cash); $('pv').textContent = usd(pv);
+  $('pl').textContent = (pl >= 0 ? '+' : '') + usd(pl); $('pl').className = 'num font-semibold ' + (pl >= 0 ? 'up' : 'down');
+}
+
+function renderLists() {
+  $('hist').innerHTML = S.hist.map(x => {
+    const b = x.side === 'buy', sum = x.qty * x.price + (b ? x.fee : -x.fee);
+    return `<tr class="border-t border-slate-700 row"><td class="text-left py-2 text-slate-400">${x.time}</td><td class="text-left ${b ? 'up' : 'down'}">${b ? 'Покупка' : 'Продажа'}</td><td class="text-left font-bold">${x.t}</td><td>${x.qty}</td><td>${usd(x.price)}</td><td>${usd(x.fee)}</td><td>${usd(sum)}</td></tr>`;
+  }).join('') || '<tr><td colspan="7" class="py-6 text-center text-slate-400">Операций пока нет. Совершите первую сделку в терминале.</td></tr>';
+  $('pending').innerHTML = S.pending.map(o => `<div class="flex justify-between items-center"><span>${o.side === 'buy' ? 'Покупка' : 'Продажа'} ${o.qty} ${o.t} @ ${usd(o.price)}</span><button data-c="${o.id}" class="text-red-400 text-xs hover:underline">Отменить</button></div>`).join('') || '<div class="text-slate-400">Нет активных ордеров</div>';
+  document.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { S.pending = S.pending.filter(o => o.id != b.dataset.c); toast('Ордер отменён'); renderLists(); });
+}
+
+function renderForm() {
+  const buy = S.side === 'buy', s = cur(), qty = parseInt($('qty').value) || 0;
+  const on = 'bg-emerald-500 text-slate-900', offc = 'text-slate-300';
+  $('bBuy').className = 'py-2 rounded-md transition ' + (buy ? on : offc);
+  $('bSell').className = 'py-2 rounded-md transition ' + (!buy ? 'bg-red-500 text-white' : offc);
+  $('tMkt').className = 'py-1.5 rounded-md border transition ' + (S.type === 'market' ? 'border-emerald-500 text-emerald-400' : 'border-slate-600');
+  $('tLim').className = 'py-1.5 rounded-md border transition ' + (S.type === 'limit' ? 'border-emerald-500 text-emerald-400' : 'border-slate-600');
+  $('limWrap').classList.toggle('hidden', S.type === 'market');
+  const px = S.type === 'market' ? s.p : (parseFloat($('lim').value) || s.p);
+  const sub = qty * px, fee = sub * FEE;
+  $('sub').textContent = usd(sub); $('fee').textContent = usd(fee);
+  $('totLbl').textContent = buy ? 'К списанию' : 'К зачислению';
+  $('total').textContent = usd(buy ? sub + fee : sub - fee);
+  $('submit').textContent = (buy ? 'Купить ' : 'Продать ') + s.t;
+  $('submit').className = 'w-full py-3 rounded-lg font-bold transition active:scale-95 ' + (buy ? 'bg-emerald-500 text-slate-900 hover:bg-emerald-400' : 'bg-red-500 text-white hover:bg-red-400');
+}
+
+function renderHeader() {
+  $('mcap').textContent = '$' + fmt(stocks.filter(s => s.sh).reduce((a, s) => a + s.p * s.sh, 0) / 1000, 2) + ' трлн';
+  const item = i => { const ch = (i.p / i.open - 1) * 100, up = ch >= 0; return `<span class="num"><b>${i.n}</b> ${fmt(i.p)} <span class="${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${fmt(Math.abs(ch))}%</span></span>`; };
+  const h = indices.map(item).join(''); $('indices').innerHTML = h + h; // дублируем для бесшовной прокрутки
+}
+
+function renderAll() { renderWatch(); renderSel(); renderBook(); renderPortfolio(); renderLists(); renderForm(); renderHeader(); if (S.view === 'catalog') renderCatalog(); }
+
+/* ---------- Рыночный цикл (каждые 2.5 с) ---------- */
+function tick() {
+  stocks.forEach(s => {
+    s.last = s.p;
+    const drift = s.imp ? s.imp.dir * s.v * 1.5 : 0;
+    if (s.imp && --s.imp.left <= 0) s.imp = null;
+    s.p = Math.max(1, s.p * (1 + rnd(-s.v, s.v) + drift));
+    s.hist.push(s.p); s.hist.shift();
+    s.hi = Math.max(s.hi, s.p); s.lo = Math.min(s.lo, s.p);
+    s.vol *= 1 + rnd(.0002, .001) * (s.imp ? 4 : 1);
+  });
+  indices.forEach(i => { i.last = i.p; i.p *= 1 + rnd(-i.v, i.v); });
+  checkPending(); renderAll(); updateChart(); pushTape();
+}
+
+/* ---------- События ---------- */
+$('bBuy').onclick = () => { S.side = 'buy'; renderForm(); };
+$('bSell').onclick = () => { S.side = 'sell'; renderForm(); };
+$('tMkt').onclick = () => { S.type = 'market'; renderForm(); };
+$('tLim').onclick = () => { S.type = 'limit'; $('lim').value = cur().p.toFixed(2); renderForm(); };
+$('qty').oninput = $('lim').oninput = renderForm;
+$('maxBtn').onclick = () => {
+  const s = cur(), px = S.type === 'limit' ? (parseFloat($('lim').value) || s.p) : s.p;
+  $('qty').value = Math.max(1, S.side === 'buy' ? Math.floor(S.cash / (px * (1 + FEE))) : (S.pos[s.t]?.qty || 1)); renderForm();
+};
+$('submit').onclick = submitOrder;
+
+/* ---------- Экраны, каталог, личный кабинет ---------- */
+Object.assign(S, {view:'terminal', cf:'all', q:'', watch:new Set(['AAPL', 'TSLA', 'MSFT', 'NVDA', 'KO', 'CAT', 'AMZN', 'JPM'])});
+
+function show(v) {
+  S.view = v;
+  document.querySelectorAll('.view').forEach(e => e.classList.toggle('hidden', e.id !== 'v-' + v));
+  document.querySelectorAll('[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  renderAll(); if (v === 'terminal') updateChart();
+  window.scrollTo(0, 0);
+}
+
+function renderCatalog() {
+  const q = S.q.trim().toLowerCase();
+  const list = stocks.filter(s => (S.cf === 'all' || s.type === S.cf) && (!q || s.t.toLowerCase().includes(q) || s.n.toLowerCase().includes(q)));
+  $('cGrid').innerHTML = list.map(s => {
+    const ch = (s.p / s.open - 1) * 100, up = ch >= 0;
+    return `<div data-i="${s.t}" class="card row cursor-pointer p-4">
+      <div class="flex justify-between gap-2"><div><div class="font-bold">${s.t}</div><div class="text-xs text-slate-400">${s.n}</div></div><span class="text-xs text-slate-400">${TYPES[s.type]}</span></div>
+      <div class="flex items-end justify-between mt-2 num"><div class="font-semibold">${usd(s.p)}</div><div class="text-xs ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${fmt(Math.abs(ch))}%</div></div>${spark(s.hist, up)}</div>`;
+  }).join('') || '<div class="col-span-full py-10 text-center text-slate-400">Ничего не найдено. Измените запрос или выберите другой тип.</div>';
+  document.querySelectorAll('[data-i]').forEach(e => e.onclick = () => openModal(e.dataset.i));
+}
+
+function openModal(t) {
+  const s = stocks.find(x => x.t === t), ch = (s.p / s.open - 1) * 100, up = ch >= 0;
+  const m = (l, v) => `<div><div class="text-xs text-slate-400">${l}</div><div class="font-semibold num">${v}</div></div>`;
+  $('mBody').innerHTML = `
+    <div class="flex justify-between items-start gap-3"><div><div class="text-xl font-bold">${s.n}</div><div class="text-xs text-slate-400">${s.t} · ${TYPES[s.type]} · ${EX[s.type]}</div></div>
+      <button id="mClose" aria-label="Закрыть" class="text-slate-400 text-2xl leading-none">×</button></div>
+    <div class="flex items-end justify-between my-3"><div class="text-3xl font-extrabold num">${usd(s.p)}</div><div class="num text-sm ${up ? 'up' : 'down'}">${up ? '+' : ''}${fmt(ch)}% за день</div></div>
+    ${spark(s.hist, up)}
+    <p class="text-sm my-4">${s.desc}</p>
+    <div class="grid grid-cols-3 gap-3 mb-5 text-sm">${m('Market Cap', capStr(s))}${m(s.type === 'bond' ? 'Доходность' : 'Dividend Yield', s.div != null ? fmt(s.div) + '%' : '—')}${m('P/E', s.pe ? fmt(s.pe, 1) : '—')}</div>
+    <div class="grid grid-cols-2 gap-2">
+      <button data-go="buy" class="py-3 rounded-lg font-bold bg-emerald-500 text-slate-900 hover:bg-emerald-400">Купить</button>
+      <button data-go="sell" class="py-3 rounded-lg font-bold bg-red-500 text-white hover:bg-red-400">Продать</button></div>`;
+  $('mClose').onclick = closeModal;
+  document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => openTrade(t, b.dataset.go));
+  $('modal').classList.remove('hidden');
+}
+const closeModal = () => $('modal').classList.add('hidden');
+
+function openTrade(t, side) {
+  S.sel = t; S.side = side; S.watch.add(t); closeModal();
+  $('lim').value = cur().p.toFixed(2); show('terminal');
+}
+
+const pie = new Chart($('pie'), {
+  type:'doughnut',
+  data:{labels:[], datasets:[{data:[], borderWidth:2, borderColor:'#1e293b'}]},
+  options:{cutout:'68%', maintainAspectRatio:false, plugins:{legend:{display:false}}}
+});
+const PIE = [['stock', 'Акции', '#10b981'], ['bond', 'Облигации', '#38bdf8'], ['etf', 'ETF', '#a78bfa'], ['fx', 'Валюта', '#f59e0b']];
+
+function renderAccount(pv, pl) {
+  const by = {stock:0, bond:0, etf:0, fx:0};
+  Object.entries(S.pos).forEach(([t, p]) => { const s = stocks.find(x => x.t === t); by[s.type] += p.qty * s.p; });
+  const vals = [...PIE.map(x => by[x[0]]), S.cash], names = [...PIE.map(x => x[1]), 'Кэш'], cols = [...PIE.map(x => x[2]), '#64748b'];
+  const tot = vals.reduce((a, b) => a + b, 0);
+  Object.assign(pie.data.datasets[0], {data:vals, backgroundColor:cols}); pie.data.labels = names; pie.update('none');
+  $('alloc').innerHTML = names.map((n, i) => `<div class="flex justify-between items-center"><span class="flex items-center gap-2"><i class="inline-block w-2.5 h-2.5 rounded-full" style="background:${cols[i]}"></i>${n}</span><span class="num">${fmt(vals[i] / tot * 100)}%</span></div>`).join('');
+  $('kEq').textContent = usd(S.cash + pv); $('kCash').textContent = usd(S.cash); $('kPV').textContent = usd(pv);
+  $('kPL').textContent = (pl >= 0 ? '+' : '') + usd(pl); $('kPL').className = 'text-2xl font-extrabold num ' + (pl >= 0 ? 'up' : 'down');
+}
+
+document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => show(b.dataset.v));
+document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
+  S.cf = b.dataset.f; document.querySelectorAll('[data-f]').forEach(x => x.classList.toggle('on', x === b)); renderCatalog();
+});
+$('cSearch').oninput = e => { S.q = e.target.value; renderCatalog(); };
+$('modal').onclick = e => { if (e.target === $('modal')) closeModal(); };
+document.onkeydown = e => { if (e.key === 'Escape') closeModal(); };
+
+/* ---------- Новости ---------- */
+const SRC = ['Reuters', 'Bloomberg', 'CNBC', 'Financial Times'];
+const RT = {AAPL:'AAPL.OQ', TSLA:'TSLA.OQ', MSFT:'MSFT.OQ', NVDA:'NVDA.OQ', KO:'KO.N', CAT:'CAT.N', AMZN:'AMZN.OQ', JPM:'JPM.N'};
+const LINK = {
+  'Reuters': t => 'https://www.reuters.com/markets/companies/' + RT[t] + '/',
+  'Bloomberg': t => 'https://www.bloomberg.com/quote/' + t + ':US',
+  'CNBC': t => 'https://www.cnbc.com/quotes/' + t,
+  'Financial Times': () => 'https://www.ft.com/markets',
+};
+const HEAD = {
+  up: ['{n} повышает прогноз на год на фоне устойчивого спроса', 'Аналитики повысили целевую цену {t} перед публикацией отчётности', '{n} объявляет о программе обратного выкупа акций', 'Институциональные инвесторы наращивают позиции в {t}, следует из отчётов'],
+  dn: ['{n} под проверкой регулятора: акции снижаются', 'Брокер понизил рекомендацию по {t} из-за высокой оценки', '{n} предупредила о давлении на маржу из-за роста затрат', 'Перебои в цепочках поставок ухудшают прогноз {n}'],
+};
+S.news = [];
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+function addNews(agoMin = 0, live = true) {
+  const s = pick(stocks.filter(x => x.type === 'stock')), dir = Math.random() > .5 ? 1 : -1, src = pick(SRC), pct = dir * rnd(.4, 1);
+  const title = pick(HEAD[dir > 0 ? 'up' : 'dn']).replace('{n}', SHORT[s.t]).replace('{t}', s.t);
+  if (live) { // мгновенный скачок цены и затухающий дрейф в сторону новости
+    s.p *= 1 + pct / 100; s.hist[s.hist.length - 1] = s.p;
+    s.hi = Math.max(s.hi, s.p); s.lo = Math.min(s.lo, s.p); s.imp = {dir, left:6};
+  }
+  S.news.unshift({time:new Date(Date.now() - agoMin * 60000), src, t:s.t, title, dir, pct, born:live ? Date.now() : 0, url:LINK[src](s.t)});
+  S.news = S.news.slice(0, 14);
+  if (live) { renderAll(); updateChart(); renderNews(); setTimeout(renderNews, 46000); }
+}
+
+function renderNews() {
+  $('news').innerHTML = S.news.map(n => {
+    const c = n.dir > 0 ? 'up' : 'down', fresh = Date.now() - n.born < 45000;
+    const badge = fresh ? `<span class="imp ${c}"><i></i>Влияние: ${n.t} ${n.dir > 0 ? '+' : '−'}</span>` : `<span class="${c} text-xs num">${n.t} ${n.pct > 0 ? '+' : ''}${fmt(n.pct)}%</span>`;
+    return `<a href="${n.url}" target="_blank" rel="noopener noreferrer" class="row flex items-start gap-3 px-2 py-2 border-t border-slate-700">
+      <span class="num text-xs text-slate-400 w-12 shrink-0 pt-0.5">${n.time.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}</span>
+      <div class="min-w-0 flex-1"><div class="text-xs text-slate-400">${n.src}</div><div class="font-medium">${n.title}</div></div>
+      <div class="shrink-0">${badge}</div></a>`;
+  }).join('');
+}
+
+/* ---------- Старт ---------- */
+$('lim').value = cur().p.toFixed(2);
+const clock = () => $('clock').textContent = 'ET ' + new Date().toLocaleTimeString('en-GB', {timeZone:'America/New_York'});
+clock(); setInterval(clock, 1000);
+[52, 34, 18, 9, 3].forEach(m => addNews(m, false)); renderNews();
+setInterval(addNews, 15000);
+renderAll(); updateChart(); for (let i = 0; i < 10; i++) pushTape();
+setInterval(tick, 2500);
+</script>
+</body>
+</html>
